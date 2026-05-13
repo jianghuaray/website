@@ -9,6 +9,7 @@ let currentEditingId = null;
 let currentDeletingId = null;
 let adminTimeout = null;
 let isScrollingToSection = false;
+let draggedCardId = null;
 
 // 分类列表
 const CATEGORIES = ['常用', '学习', '工作', '政务', '工具', '其他'];
@@ -108,7 +109,43 @@ function renderSection(category, categoryLinks) {
 function renderCard(link) {
     const card = document.createElement('div');
     card.className = 'card';
+    card.dataset.id = link.id;
     card.onclick = () => openLink(link.url);
+
+    if (isAdminMode) {
+        card.draggable = true;
+        card.addEventListener('dragstart', (e) => {
+            draggedCardId = link.id;
+            card.style.opacity = '0.4';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        card.addEventListener('dragend', () => {
+            draggedCardId = null;
+            card.style.opacity = '';
+            document.querySelectorAll('.card').forEach(c => c.style.opacity = '');
+        });
+        card.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        card.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!draggedCardId || draggedCardId === link.id) return;
+            const grid = card.parentElement;
+            const draggedEl = grid.querySelector(`[data-id="${draggedCardId}"]`);
+            if (!draggedEl) return;
+            const cards = [...grid.children];
+            const dragIdx = cards.indexOf(draggedEl);
+            const dropIdx = cards.indexOf(card);
+            if (dragIdx < dropIdx) {
+                grid.insertBefore(draggedEl, card.nextSibling);
+            } else {
+                grid.insertBefore(draggedEl, card);
+            }
+            const newOrder = [...grid.querySelectorAll('.card')].map(c => c.dataset.id);
+            saveReorder(newOrder);
+        });
+    }
 
     const faviconUrl = getFaviconUrl(link.url);
     const iconContent = faviconUrl
@@ -199,6 +236,8 @@ function enterAdminMode() {
     isAdminMode = true;
     document.body.classList.add('admin-mode');
     document.getElementById('adminBar').classList.add('show');
+    renderAllSections();
+    setupIntersectionObserver();
     showToast('已进入管理模式');
 
     // 设置30分钟自动退出
@@ -216,6 +255,8 @@ function exitAdminMode() {
     localStorage.removeItem('nav_auth_token');
     document.body.classList.remove('admin-mode');
     document.getElementById('adminBar').classList.remove('show');
+    renderAllSections();
+    setupIntersectionObserver();
     showToast('已退出管理模式');
 
     if (adminTimeout) {
@@ -496,6 +537,29 @@ function showToast(message) {
     toast.textContent = message;
     toast.classList.add('show');
     setTimeout(() => toast.classList.remove('show'), 2500);
+}
+
+// 保存排序
+async function saveReorder(orderedIds) {
+    try {
+        const response = await fetch(`${API_BASE}/api/links/reorder`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ orderedIds })
+        });
+
+        if (response.ok) {
+            await loadLinks();
+        } else if (response.status === 401) {
+            showToast('登录已过期，请重新登录');
+            exitAdminMode();
+        }
+    } catch (error) {
+        showToast('排序保存失败');
+    }
 }
 
 // 启动应用

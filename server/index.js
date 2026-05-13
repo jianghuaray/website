@@ -182,6 +182,35 @@ app.post('/api/auth', (req, res) => {
     }
 });
 
+// 排序链接（需认证）
+app.put('/api/links/reorder', authMiddleware, (req, res) => {
+    const { orderedIds } = req.body;
+
+    if (!orderedIds || !Array.isArray(orderedIds)) {
+        return res.status(400).json({ error: '请提供排序数据' });
+    }
+
+    const data = readData();
+    const reordered = [];
+    const remaining = [];
+
+    orderedIds.forEach(id => {
+        const link = data.links.find(l => l.id === id);
+        if (link) reordered.push(link);
+    });
+
+    data.links.forEach(link => {
+        if (!orderedIds.includes(link.id)) {
+            remaining.push(link);
+        }
+    });
+
+    data.links = [...remaining, ...reordered];
+    writeData(data);
+
+    res.json({ message: '排序已保存' });
+});
+
 // 导出配置（需认证）
 app.get('/api/export', authMiddleware, (req, res) => {
     const data = readData();
