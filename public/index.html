@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的导航</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #FDFCFA;
+            --bg-warm: #F8F7F4;
+            --paper: #FFFFFF;
+            --paper-elevated: #FFFFFF;
+            --text-primary: #1A1A1A;
+            --text-secondary: #5A5A5A;
+            --text-tertiary: #9A9895;
+            --border: rgba(0, 0, 0, 0.06);
+            --border-strong: rgba(0, 0, 0, 0.12);
+            --accent: #B87333;
+            --accent-light: #D4A574;
+            --accent-dark: #8B5A2B;
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --ease-out: cubic-bezier(0, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 200px;
+            height: 100vh;
+            background: var(--bg-warm);
+            border-right: 1px solid var(--border);
+            padding: 48px 0 32px;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+
+        .brand { padding: 0 32px 48px; }
+
+        .brand-title {
+            font-family: 'Crimson Text', serif;
+            font-size: 26px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+        }
+
+        .brand-subtitle {
+            font-family: 'Crimson Text', serif;
+            font-size: 13px;
+            font-style: italic;
+            color: var(--text-tertiary);
+            margin-top: 6px;
+        }
+
+        .nav { flex: 1; overflow-y: auto; }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 32px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s var(--ease-smooth);
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%) scaleY(0);
+            width: 2px;
+            height: 20px;
+            background: var(--accent);
+            transition: transform 0.3s var(--ease-out);
+        }
+
+        .nav-item:hover { color: var(--text-primary); background: rgba(0, 0, 0, 0.02); }
+        .nav-item.active { color: var(--text-primary); font-weight: 500; }
+        .nav-item.active::before { transform: translateY(-50%) scaleY(1); }
+
+        .nav-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background: var(--text-tertiary);
+            transition: all 0.3s var(--ease-smooth);
+        }
+
+        .nav-item:hover .nav-dot, .nav-item.active .nav-dot {
+            background: var(--accent);
+            transform: scale(1.2);
+        }
+
+        .main {
+            margin-left: 200px;
+            padding: 48px 48px 120px;
+            max-width: 1200px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .section { margin-bottom: 48px; }
+
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-family: 'Crimson Text', serif;
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .section-count { font-size: 12px; color: var(--text-tertiary); }
+
+        .btn-add {
+            display: none;
+            margin-left: auto;
+            padding: 6px 14px;
+            font-size: 12px;
+            color: var(--accent);
+            background: transparent;
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.25s var(--ease-smooth);
+        }
+
+        .btn-add:hover { background: var(--accent); color: white; border-color: var(--accent); }
+        body.admin-mode .btn-add { display: inline-block; }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 12px;
+        }
+
+        .card {
+            background: var(--paper);
+            border-radius: 10px;
+            padding: 16px 12px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s var(--ease-smooth);
+            text-align: center;
+            overflow: hidden;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.9),
+                0 2px 4px rgba(0, 0, 0, 0.04),
+                0 4px 8px rgba(0, 0, 0, 0.03),
+                0 8px 16px rgba(0, 0, 0, 0.02);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background-image:
+                linear-gradient(90deg, transparent 49%, rgba(0,0,0,0.04) 49%, rgba(0,0,0,0.04) 51%, transparent 51%),
+                linear-gradient(0deg, transparent 49%, rgba(0,0,0,0.04) 49%, rgba(0,0,0,0.04) 51%, transparent 51%);
+            background-size: 18px 18px;
+            pointer-events: none;
+        }
+
+        .card-icon, .card-name {
+            position: relative;
+            z-index: 1;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.95),
+                0 4px 8px rgba(0, 0, 0, 0.06),
+                0 8px 16px rgba(0, 0, 0, 0.05),
+                0 16px 32px rgba(0, 0, 0, 0.03);
+            background-color: var(--paper-elevated);
+        }
+
+        .card-actions {
+            display: none;
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            gap: 4px;
+            z-index: 10;
+        }
+
+        body.admin-mode .card-actions { display: flex; }
+
+        .card-action-btn {
+            width: 24px;
+            height: 24px;
+            border-radius: 5px;
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s var(--ease-smooth);
+            color: var(--text-secondary);
+        }
+
+        .card-action-btn:hover { background: white; transform: scale(1.1); }
+        .card-action-btn.delete:hover { color: #C75B5B; }
+
+        .card-icon {
+            width: 36px;
+            height: 36px;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--accent);
+            border: 1.5px solid var(--border-strong);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .card:hover .card-icon {
+            border-color: var(--accent-light);
+            background: rgba(184, 115, 51, 0.04);
+        }
+
+        .card-icon img { width: 18px; height: 18px; object-fit: contain; opacity: 0.8; }
+
+        .card-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-tertiary);
+        }
+
+        .admin-bar {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 200px;
+            right: 0;
+            height: 48px;
+            background: rgba(253, 252, 250, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            align-items: center;
+            justify-content: center;
+            gap: 24px;
+            z-index: 99;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .admin-bar.show { display: flex; }
+
+        .admin-bar button {
+            padding: 6px 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: transparent;
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .admin-bar button:hover { border-color: var(--accent); color: var(--accent); }
+        body.admin-mode .main { padding-top: 96px; }
+
+        .fab {
+            position: fixed;
+            bottom: 28px;
+            right: 28px;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--paper-elevated);
+            color: var(--accent);
+            border: 1px solid var(--border-strong);
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            transition: all 0.3s var(--ease-smooth);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        }
+
+        .fab:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1); }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(247, 245, 242, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 500;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: var(--paper-elevated);
+            border-radius: 14px;
+            padding: 32px;
+            width: 380px;
+            max-width: 90vw;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border);
+        }
+
+        .modal-title {
+            font-family: 'Crimson Text', serif;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .form-group { margin-bottom: 16px; }
+
+        .form-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 500;
+            margin-bottom: 5px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            outline: none;
+            font-family: inherit;
+            background: var(--paper);
+            color: var(--text-primary);
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            border-color: var(--accent-light);
+        }
+
+        .form-textarea { resize: vertical; min-height: 70px; }
+        .form-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 4px; }
+        .form-error { font-size: 11px; color: #C75B5B; margin-top: 4px; }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; }
+
+        .btn {
+            padding: 9px 18px;
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 7px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s var(--ease-smooth);
+        }
+
+        .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+        .btn-secondary:hover { border-color: var(--border-strong); color: var(--text-primary); }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-dark); }
+        .btn-danger { background: transparent; color: #C75B5B; border: 1px solid rgba(199, 91, 91, 0.3); }
+        .btn-danger:hover { background: #C75B5B; color: white; }
+
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-80px);
+            background: rgba(26, 26, 26, 0.95);
+            color: white;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 13px;
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        @media (max-width: 1200px) {
+            .card-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+
+        @media (max-width: 991px) {
+            .sidebar { width: 180px; }
+            .main { margin-left: 180px; padding: 40px 32px 100px; }
+            .admin-bar { left: 180px; }
+            .card-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+
+        @media (max-width: 767px) {
+            .sidebar { width: 100%; height: auto; padding: 0; border-right: none; border-bottom: 1px solid var(--border); }
+            .brand { display: none; }
+            .nav { display: flex; overflow-x: auto; padding: 12px 16px; gap: 6px; }
+            .nav-item { padding: 8px 14px; white-space: nowrap; font-size: 13px; }
+            .nav-item::before { display: none; }
+            .nav-item.active { background: rgba(184, 115, 51, 0.08); border-radius: 16px; color: var(--accent); }
+            .main { margin-left: 0; padding: 70px 16px 100px; }
+            .admin-bar { left: 0; top: 48px; }
+            body.admin-mode .main { padding-top: 110px; }
+            .card-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+            .card { padding: 14px 10px; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="brand" onclick="toggleAdminMode()" style="cursor: pointer;">
+            <div class="brand-title">我的导航</div>
+            <div class="brand-subtitle">Sui Jianghua</div>
+        </div>
+        <nav class="nav">
+            <div class="nav-item active" data-cat="常用" onclick="scrollToSection('常用')"><span class="nav-dot"></span><span>常用</span></div>
+            <div class="nav-item" data-cat="学习" onclick="scrollToSection('学习')"><span class="nav-dot"></span><span>学习</span></div>
+            <div class="nav-item" data-cat="工作" onclick="scrollToSection('工作')"><span class="nav-dot"></span><span>工作</span></div>
+            <div class="nav-item" data-cat="政务" onclick="scrollToSection('政务')"><span class="nav-dot"></span><span>政务</span></div>
+            <div class="nav-item" data-cat="工具" onclick="scrollToSection('工具')"><span class="nav-dot"></span><span>工具</span></div>
+            <div class="nav-item" data-cat="其他" onclick="scrollToSection('其他')"><span class="nav-dot"></span><span>其他</span></div>
+        </nav>
+    </aside>
+
+    <div class="admin-bar" id="adminBar">
+        <span>管理模式</span>
+        <button onclick="exportConfig()">导出配置</button>
+        <button onclick="importConfig()">导入配置</button>
+    </div>
+
+    <main class="main" id="mainContent">
+        <!-- 动态内容将在这里渲染 -->
+    </main>
+
+    <div class="modal-overlay" id="passwordModal">
+        <div class="modal">
+            <h3 class="modal-title">管理认证</h3>
+            <div class="form-group">
+                <label class="form-label">密码</label>
+                <input type="password" class="form-input" id="passwordInput" placeholder="请输入密码">
+                <div class="form-error" id="passwordError"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('passwordModal')">取消</button>
+                <button class="btn btn-primary" onclick="doLogin()">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="linkModal">
+        <div class="modal">
+            <h3 class="modal-title" id="linkModalTitle">添加链接</h3>
+            <div class="form-group">
+                <label class="form-label">名称 *</label>
+                <input type="text" class="form-input" id="linkName" placeholder="例如：百度">
+            </div>
+            <div class="form-group">
+                <label class="form-label">链接 *</label>
+                <input type="text" class="form-input" id="linkUrl" placeholder="https://www.example.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">分类 *</label>
+                <select class="form-select" id="linkCategory">
+                    <option value="常用">常用</option>
+                    <option value="学习">学习</option>
+                    <option value="工作">工作</option>
+                    <option value="政务">政务</option>
+                    <option value="工具">工具</option>
+                    <option value="其他">其他</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('linkModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveLink()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deleteModal">
+        <div class="modal">
+            <h3 class="modal-title">确认删除</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px;">确定要删除该链接？此操作不可撤销。</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('deleteModal')">取消</button>
+                <button class="btn btn-danger" onclick="confirmDelete()">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="importModal">
+        <div class="modal">
+            <h3 class="modal-title">导入配置</h3>
+            <p style="color: var(--text-secondary); margin-bottom: 16px; font-size: 14px;">选择之前导出的 JSON 文件进行导入。</p>
+            <div class="form-group">
+                <input type="file" class="form-input" id="importFile" accept=".json">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('importModal')">取消</button>
+                <button class="btn btn-primary" onclick="confirmImport()">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
