@@ -8,6 +8,7 @@ let links = [];
 let currentEditingId = null;
 let currentDeletingId = null;
 let adminTimeout = null;
+let isScrollingToSection = false;
 
 // 分类列表
 const CATEGORIES = ['常用', '学习', '工作', '政务', '工具', '其他'];
@@ -75,8 +76,11 @@ function renderSection(category, categoryLinks) {
     header.innerHTML = `
         <h2 class="section-title">${category}</h2>
         <span class="section-count">${categoryLinks.length} 个链接</span>
-        <button class="btn-add" onclick="openAddModal('${category}')">+ 添加</button>
+        <button class="btn-add" onclick="event.stopPropagation();openAddModal('${category}')">+ 添加</button>
     `;
+    header.addEventListener('click', () => {
+        section.classList.toggle('collapsed');
+    });
 
     const cardGrid = document.createElement('div');
     cardGrid.className = 'card-grid';
@@ -140,18 +144,31 @@ function openLink(url) {
 function scrollToSection(category) {
     const section = document.getElementById(`section-${category}`);
     if (section) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+        isScrollingToSection = true;
 
-    // 更新导航高亮
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.toggle('active', item.dataset.cat === category);
-    });
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.toggle('active', item.dataset.cat === category);
+        });
+
+        const targetScrollTop = section.offsetTop - window.innerHeight * 0.25;
+        window.scrollTo({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+
+        let scrollEndTimer = null;
+        const onScroll = () => {
+            if (scrollEndTimer) clearTimeout(scrollEndTimer);
+            scrollEndTimer = setTimeout(() => {
+                isScrollingToSection = false;
+                window.removeEventListener('scroll', onScroll);
+            }, 100);
+        };
+        window.addEventListener('scroll', onScroll);
+    }
 }
 
 // 设置交叉观察器（用于滚动时更新导航高亮）
 function setupIntersectionObserver() {
     const observer = new IntersectionObserver((entries) => {
+        if (isScrollingToSection) return;
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const category = entry.target.id.replace('section-', '');

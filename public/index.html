@@ -140,6 +140,28 @@
             margin-bottom: 20px;
             padding-bottom: 12px;
             border-bottom: 1px solid var(--border);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .section-header:hover .section-title {
+            color: var(--accent);
+        }
+
+        .section.collapsed .section-header {
+            border-bottom-color: transparent;
+        }
+
+        .section.collapsed .section-title {
+            color: var(--text-tertiary);
+        }
+
+        .section.collapsed .section-count {
+            color: var(--border-strong);
+        }
+
+        .section.collapsed .card-grid {
+            display: none;
         }
 
         .section-title {
