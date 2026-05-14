@@ -14,6 +14,7 @@ let draggedCardId = null;
 let draggedNavCat = null;
 
 let categories = [];
+let sectionObserver = null;
 
 // 初始化
 async function init() {
@@ -122,16 +123,6 @@ function renderNav() {
     }
 }
 
-// 获取 favicon URL
-function getFaviconUrl(url) {
-    try {
-        const domain = new URL(url).hostname;
-        return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
-    } catch {
-        return null;
-    }
-}
-
 // 获取首字母
 function getInitials(name) {
     return name.charAt(0).toUpperCase();
@@ -157,11 +148,23 @@ function renderSection(category, categoryLinks) {
 
     const header = document.createElement('div');
     header.className = 'section-header';
-    header.innerHTML = `
-        <h2 class="section-title">${category}</h2>
-        <span class="section-count">${categoryLinks.length}</span>
-        <button class="btn-add" onclick="event.stopPropagation();openAddModal('${category}')">+ 添加</button>
-    `;
+
+    const title = document.createElement('h2');
+    title.className = 'section-title';
+    title.textContent = category;
+
+    const count = document.createElement('span');
+    count.className = 'section-count';
+    count.textContent = categoryLinks.length;
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn-add';
+    addBtn.textContent = '+ 添加';
+    addBtn.onclick = (e) => { e.stopPropagation(); openAddModal(category); };
+
+    header.appendChild(title);
+    header.appendChild(count);
+    header.appendChild(addBtn);
     header.addEventListener('click', () => {
         section.classList.toggle('collapsed');
     });
@@ -230,21 +233,38 @@ function renderCard(link) {
         });
     }
 
-    let iconContent;
-    if (link.logo) {
-        iconContent = `<img src="${link.logo}" alt="" onerror="this.parentElement.textContent='${getInitials(link.name)}';this.style.display='none'">`;
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'card-icon';
+    if (link.logo && link.logo.startsWith('/logos/')) {
+        const img = document.createElement('img');
+        img.src = link.logo;
+        img.alt = '';
+        img.onerror = function() { this.parentElement.textContent = getInitials(link.name); this.style.display = 'none'; };
+        iconDiv.appendChild(img);
     } else {
-        iconContent = getInitials(link.name);
+        iconDiv.textContent = getInitials(link.name);
     }
 
-    card.innerHTML = `
-        <div class="card-actions">
-            <button class="card-action-btn" onclick="event.stopPropagation();openEditModal('${link.id}')">✏️</button>
-            <button class="card-action-btn delete" onclick="event.stopPropagation();openDeleteModal('${link.id}')">🗑️</button>
-        </div>
-        <div class="card-icon">${iconContent}</div>
-        <div class="card-name">${escapeHtml(link.name)}</div>
-    `;
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'card-name';
+    nameDiv.textContent = link.name;
+
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'card-actions';
+    const editBtn = document.createElement('button');
+    editBtn.className = 'card-action-btn';
+    editBtn.textContent = '✏️';
+    editBtn.onclick = (e) => { e.stopPropagation(); openEditModal(link.id); };
+    const delBtn = document.createElement('button');
+    delBtn.className = 'card-action-btn delete';
+    delBtn.textContent = '🗑️';
+    delBtn.onclick = (e) => { e.stopPropagation(); openDeleteModal(link.id); };
+    actionsDiv.appendChild(editBtn);
+    actionsDiv.appendChild(delBtn);
+
+    card.appendChild(actionsDiv);
+    card.appendChild(iconDiv);
+    card.appendChild(nameDiv);
 
     return card;
 }
@@ -289,7 +309,9 @@ function scrollToSection(category) {
 
 // 设置交叉观察器（用于滚动时更新导航高亮）
 function setupIntersectionObserver() {
-    const observer = new IntersectionObserver((entries) => {
+    if (sectionObserver) sectionObserver.disconnect();
+
+    sectionObserver = new IntersectionObserver((entries) => {
         if (isScrollingToSection) return;
         entries.forEach(entry => {
             if (entry.isIntersecting) {
@@ -302,7 +324,7 @@ function setupIntersectionObserver() {
     }, { rootMargin: '-20% 0px -60% 0px' });
 
     document.querySelectorAll('.section').forEach(section => {
-        observer.observe(section);
+        sectionObserver.observe(section);
     });
 
     setTimeout(() => {
@@ -633,7 +655,9 @@ async function confirmImport() {
             const data = await response.json();
             closeModal('importModal');
             showToast(`导入成功，共 ${data.count} 个链接`);
+            await loadCategories();
             await loadLinks();
+            renderNav();
             renderAllSections();
             setupIntersectionObserver();
         } else if (response.status === 401) {

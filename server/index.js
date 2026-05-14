@@ -1,4 +1,5 @@
 const express = require('express');
+require('dotenv').config();
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const multer = require('multer');
@@ -14,7 +15,10 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '619166';
 const DATA_FILE = path.join(__dirname, 'data.json');
 
 // 中间件
-app.use(cors());
+app.use(cors({
+    origin: (origin, callback) => callback(null, !origin || origin === new URL(`http://localhost:${PORT}`).origin),
+    credentials: true
+}));
 app.use(express.json());
 
 // 确保数据文件存在
@@ -40,9 +44,11 @@ function initDataFile() {
 function readData() {
     try {
         const data = fs.readFileSync(DATA_FILE, 'utf8');
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        if (!parsed.categories) parsed.categories = [];
+        return parsed;
     } catch (error) {
-        return { links: [] };
+        return { categories: [], links: [] };
     }
 }
 
@@ -177,7 +183,12 @@ app.post('/api/links', authMiddleware, (req, res) => {
         updatedAt: new Date().toISOString()
     };
 
-    if (logo) newLink.logo = logo;
+    if (logo) {
+        if (!logo.startsWith('/logos/')) {
+            return res.status(400).json({ error: 'Logo 路径不合法' });
+        }
+        newLink.logo = logo;
+    }
 
     data.links.push(newLink);
     writeData(data);
@@ -209,7 +220,12 @@ app.put('/api/links/:id', authMiddleware, (req, res) => {
         updatedAt: new Date().toISOString()
     };
 
-    if (logo !== undefined) data.links[linkIndex].logo = logo;
+    if (logo !== undefined) {
+        if (logo && !logo.startsWith('/logos/')) {
+            return res.status(400).json({ error: 'Logo 路径不合法' });
+        }
+        data.links[linkIndex].logo = logo;
+    }
 
     writeData(data);
     res.json(data.links[linkIndex]);
@@ -373,7 +389,7 @@ const logoUpload = multer({
     storage: logoStorage,
     limits: { fileSize: 2 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
-        const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp'];
+        const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp'];
         const ext = path.extname(file.originalname).toLowerCase();
         if (allowed.includes(ext)) cb(null, true);
         else cb(new Error('不支持的图片格式'));
