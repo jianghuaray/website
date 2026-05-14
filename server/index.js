@@ -157,7 +157,7 @@ app.put('/api/categories/reorder', authMiddleware, (req, res) => {
 
 // 添加链接（需认证）
 app.post('/api/links', authMiddleware, (req, res) => {
-    const { name, url, category } = req.body;
+    const { name, url, category, logo } = req.body;
 
     if (!name || !url || !category) {
         return res.status(400).json({ error: '名称、链接和分类为必填项' });
@@ -177,6 +177,8 @@ app.post('/api/links', authMiddleware, (req, res) => {
         updatedAt: new Date().toISOString()
     };
 
+    if (logo) newLink.logo = logo;
+
     data.links.push(newLink);
     writeData(data);
 
@@ -186,7 +188,7 @@ app.post('/api/links', authMiddleware, (req, res) => {
 // 编辑链接（需认证）
 app.put('/api/links/:id', authMiddleware, (req, res) => {
     const { id } = req.params;
-    const { name, url, category } = req.body;
+    const { name, url, category, logo } = req.body;
 
     const data = readData();
     const linkIndex = data.links.findIndex(l => l.id === id);
@@ -206,6 +208,8 @@ app.put('/api/links/:id', authMiddleware, (req, res) => {
         category: category?.trim() || data.links[linkIndex].category,
         updatedAt: new Date().toISOString()
     };
+
+    if (logo !== undefined) data.links[linkIndex].logo = logo;
 
     writeData(data);
     res.json(data.links[linkIndex]);
@@ -345,7 +349,38 @@ app.post('/api/import', authMiddleware, upload.single('file'), (req, res) => {
     }
 });
 
+// Logo 上传（需认证）
+const logoStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, 'logos');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname) || '.png';
+        cb(null, Date.now().toString(36) + Math.random().toString(36).substr(2, 5) + ext);
+    }
+});
+const logoUpload = multer({
+    storage: logoStorage,
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.webp'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (allowed.includes(ext)) cb(null, true);
+        else cb(new Error('不支持的图片格式'));
+    }
+});
+
+app.post('/api/upload-logo', authMiddleware, logoUpload.single('logo'), (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: '请上传图片' });
+    }
+    res.json({ path: `/logos/${req.file.filename}` });
+});
+
 // 静态文件服务
+app.use('/logos', express.static(path.join(__dirname, 'logos')));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // 启动服务器

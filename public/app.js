@@ -7,6 +7,7 @@ let authToken = localStorage.getItem('nav_auth_token');
 let links = [];
 let currentEditingId = null;
 let currentDeletingId = null;
+let currentLogoPath = null;
 let adminTimeout = null;
 let isScrollingToSection = false;
 let draggedCardId = null;
@@ -158,7 +159,7 @@ function renderSection(category, categoryLinks) {
     header.className = 'section-header';
     header.innerHTML = `
         <h2 class="section-title">${category}</h2>
-        <span class="section-count">${categoryLinks.length} 个链接</span>
+        <span class="section-count">${categoryLinks.length}</span>
         <button class="btn-add" onclick="event.stopPropagation();openAddModal('${category}')">+ 添加</button>
     `;
     header.addEventListener('click', () => {
@@ -229,10 +230,12 @@ function renderCard(link) {
         });
     }
 
-    const faviconUrl = getFaviconUrl(link.url);
-    const iconContent = faviconUrl
-        ? `<img src="${faviconUrl}" alt="" onerror="this.parentElement.textContent='${getInitials(link.name)}';this.style.display='none'">`
-        : getInitials(link.name);
+    let iconContent;
+    if (link.logo) {
+        iconContent = `<img src="${link.logo}" alt="" onerror="this.parentElement.textContent='${getInitials(link.name)}';this.style.display='none'">`;
+    } else {
+        iconContent = getInitials(link.name);
+    }
 
     card.innerHTML = `
         <div class="card-actions">
@@ -397,9 +400,13 @@ async function doLogin() {
 // 打开添加弹窗
 function openAddModal(category) {
     currentEditingId = null;
+    currentLogoPath = null;
     document.getElementById('linkModalTitle').textContent = '添加链接';
     document.getElementById('linkName').value = '';
     document.getElementById('linkUrl').value = '';
+    document.getElementById('linkLogo').value = '';
+    document.getElementById('logoPreview').style.display = 'none';
+    document.getElementById('logoPreview').src = '';
     updateCategorySelect(category);
     openModal('linkModal');
 }
@@ -410,9 +417,19 @@ function openEditModal(id) {
     if (!link) return;
 
     currentEditingId = id;
+    currentLogoPath = link.logo || null;
     document.getElementById('linkModalTitle').textContent = '编辑链接';
     document.getElementById('linkName').value = link.name;
     document.getElementById('linkUrl').value = link.url;
+    document.getElementById('linkLogo').value = '';
+    const preview = document.getElementById('logoPreview');
+    if (link.logo) {
+        preview.src = link.logo;
+        preview.style.display = 'block';
+    } else {
+        preview.src = '';
+        preview.style.display = 'none';
+    }
     updateCategorySelect(link.category);
     openModal('linkModal');
 }
@@ -435,6 +452,7 @@ async function saveLink() {
     const name = document.getElementById('linkName').value.trim();
     const url = document.getElementById('linkUrl').value.trim();
     const category = document.getElementById('linkCategory').value;
+    const logoFile = document.getElementById('linkLogo').files[0];
 
     if (!name || !url || !category) {
         showToast('请填写必填项');
@@ -446,7 +464,32 @@ async function saveLink() {
         return;
     }
 
+    let logoPath = currentLogoPath;
+    if (logoFile) {
+        try {
+            const formData = new FormData();
+            formData.append('logo', logoFile);
+            const uploadRes = await fetch(`${API_BASE}/api/upload-logo`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${authToken}` },
+                body: formData
+            });
+            if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                logoPath = uploadData.path;
+            } else if (uploadRes.status === 401) {
+                showToast('登录已过期，请重新登录');
+                exitAdminMode();
+                return;
+            }
+        } catch (error) {
+            showToast('Logo 上传失败');
+            return;
+        }
+    }
+
     const linkData = { name, url, category };
+    if (logoPath) linkData.logo = logoPath;
 
     try {
         let response;
