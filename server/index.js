@@ -337,7 +337,15 @@ app.post('/api/import', authMiddleware, upload.single('file'), (req, res) => {
             return link.id && link.name && link.url && link.category;
         });
 
-        writeData({ links: validLinks });
+        const data = readData();
+        data.links = validLinks;
+        const importedCats = [...new Set(validLinks.map(l => l.category))];
+        importedCats.forEach(cat => {
+            if (!data.categories.includes(cat)) {
+                data.categories.push(cat);
+            }
+        });
+        writeData(data);
         fs.unlinkSync(req.file.path);
 
         res.json({ message: '导入成功', count: validLinks.length });
