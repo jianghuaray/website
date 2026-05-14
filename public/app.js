@@ -10,22 +10,18 @@ let currentDeletingId = null;
 let adminTimeout = null;
 let isScrollingToSection = false;
 let draggedCardId = null;
+let draggedNavCat = null;
 
-// 分类列表
-const CATEGORIES = ['常用', '学习', '工作', '政务', '工具', '其他'];
+let categories = [];
 
 // 初始化
 async function init() {
+    await loadCategories();
     await loadLinks();
+    renderNav();
     renderAllSections();
     setupIntersectionObserver();
     setupModalListeners();
-
-    // 检查 token 是否有效
-    if (authToken) {
-        // 如果 token 存在，直接进入管理模式（token 过期会在 API 调用时处理）
-        enterAdminMode();
-    }
 }
 
 // 加载链接数据
@@ -36,6 +32,92 @@ async function loadLinks() {
     } catch (error) {
         showToast('加载数据失败');
         links = [];
+    }
+}
+
+// 加载分类数据
+async function loadCategories() {
+    try {
+        const response = await fetch(`${API_BASE}/api/categories`);
+        categories = await response.json();
+    } catch (error) {
+        categories = ['常用', '学习', '工作', '政务', '工具', '其他'];
+    }
+}
+
+// 渲染侧边栏导航
+function renderNav() {
+    const nav = document.querySelector('.nav');
+    nav.innerHTML = '';
+
+    categories.forEach((cat, index) => {
+        const item = document.createElement('div');
+        item.className = 'nav-item' + (cat === '常用' ? ' active' : '');
+        item.dataset.cat = cat;
+
+        const dot = document.createElement('span');
+        dot.className = 'nav-dot';
+
+        const label = document.createElement('span');
+        label.className = 'nav-label';
+        label.textContent = cat;
+
+        item.appendChild(dot);
+        item.appendChild(label);
+
+        item.addEventListener('click', () => scrollToSection(cat));
+        item.addEventListener('dblclick', () => {
+            if (isAdminMode) openEditCategoryModal(cat);
+        });
+
+        if (isAdminMode) {
+            item.draggable = true;
+            item.addEventListener('dragstart', (e) => {
+                draggedNavCat = cat;
+                item.style.opacity = '0.4';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            item.addEventListener('dragend', () => {
+                draggedNavCat = null;
+                item.style.opacity = '';
+            });
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (!draggedNavCat || draggedNavCat === cat) return;
+                const items = [...nav.querySelectorAll('.nav-item')];
+                const dragIdx = categories.indexOf(draggedNavCat);
+                const dropIdx = categories.indexOf(cat);
+                categories.splice(dragIdx, 1);
+                categories.splice(dropIdx, 0, draggedNavCat);
+                saveCategoryReorder();
+                renderNav();
+                renderAllSections();
+                setupIntersectionObserver();
+            });
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'nav-cat-del';
+            delBtn.textContent = '×';
+            delBtn.onclick = (e) => {
+                e.stopPropagation();
+                openDeleteCategoryModal(cat);
+            };
+            item.appendChild(delBtn);
+        }
+
+        nav.appendChild(item);
+    });
+
+    if (isAdminMode) {
+        const addBtn = document.createElement('div');
+        addBtn.className = 'nav-item nav-add-cat';
+        addBtn.innerHTML = '<span>+</span><span>添加分类</span>';
+        addBtn.onclick = () => openAddCategoryModal();
+        nav.appendChild(addBtn);
     }
 }
 
@@ -59,7 +141,7 @@ function renderAllSections() {
     const mainContent = document.getElementById('mainContent');
     mainContent.innerHTML = '';
 
-    CATEGORIES.forEach(category => {
+    categories.forEach(category => {
         const categoryLinks = links.filter(link => link.category === category);
         const section = renderSection(category, categoryLinks);
         mainContent.appendChild(section);
@@ -219,6 +301,14 @@ function setupIntersectionObserver() {
     document.querySelectorAll('.section').forEach(section => {
         observer.observe(section);
     });
+
+    setTimeout(() => {
+        const defaultItem = document.querySelector('.nav-item[data-cat="常用"]');
+        if (defaultItem) {
+            document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+            defaultItem.classList.add('active');
+        }
+    }, 100);
 }
 
 // 管理模式切换
@@ -236,6 +326,7 @@ function enterAdminMode() {
     isAdminMode = true;
     document.body.classList.add('admin-mode');
     document.getElementById('adminBar').classList.add('show');
+    renderNav();
     renderAllSections();
     setupIntersectionObserver();
     showToast('已进入管理模式');
@@ -255,6 +346,7 @@ function exitAdminMode() {
     localStorage.removeItem('nav_auth_token');
     document.body.classList.remove('admin-mode');
     document.getElementById('adminBar').classList.remove('show');
+    renderNav();
     renderAllSections();
     setupIntersectionObserver();
     showToast('已退出管理模式');
@@ -308,7 +400,7 @@ function openAddModal(category) {
     document.getElementById('linkModalTitle').textContent = '添加链接';
     document.getElementById('linkName').value = '';
     document.getElementById('linkUrl').value = '';
-    document.getElementById('linkCategory').value = category;
+    updateCategorySelect(category);
     openModal('linkModal');
 }
 
@@ -321,8 +413,21 @@ function openEditModal(id) {
     document.getElementById('linkModalTitle').textContent = '编辑链接';
     document.getElementById('linkName').value = link.name;
     document.getElementById('linkUrl').value = link.url;
-    document.getElementById('linkCategory').value = link.category;
+    updateCategorySelect(link.category);
     openModal('linkModal');
+}
+
+// 更新分类下拉框
+function updateCategorySelect(selectedCat) {
+    const select = document.getElementById('linkCategory');
+    select.innerHTML = '';
+    categories.forEach(cat => {
+        const opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        if (cat === selectedCat) opt.selected = true;
+        select.appendChild(opt);
+    });
 }
 
 // 保存链接
@@ -559,6 +664,133 @@ async function saveReorder(orderedIds) {
         }
     } catch (error) {
         showToast('排序保存失败');
+    }
+}
+
+// 保存分类排序
+async function saveCategoryReorder() {
+    try {
+        const response = await fetch(`${API_BASE}/api/categories/reorder`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ categories })
+        });
+        if (!response.ok && response.status === 401) {
+            showToast('登录已过期，请重新登录');
+            exitAdminMode();
+        }
+    } catch (error) {
+        showToast('排序保存失败');
+    }
+}
+
+// 打开添加分类弹窗
+function openAddCategoryModal() {
+    document.getElementById('categoryModalTitle').textContent = '添加分类';
+    document.getElementById('categoryNameInput').value = '';
+    document.getElementById('categoryModal').dataset.mode = 'add';
+    openModal('categoryModal');
+    document.getElementById('categoryNameInput').focus();
+}
+
+// 打开编辑分类弹窗
+function openEditCategoryModal(cat) {
+    document.getElementById('categoryModalTitle').textContent = '编辑分类';
+    document.getElementById('categoryNameInput').value = cat;
+    document.getElementById('categoryModal').dataset.mode = 'edit';
+    document.getElementById('categoryModal').dataset.oldName = cat;
+    openModal('categoryModal');
+    document.getElementById('categoryNameInput').focus();
+}
+
+// 保存分类（添加或编辑）
+async function saveCategory() {
+    const name = document.getElementById('categoryNameInput').value.trim();
+    const modal = document.getElementById('categoryModal');
+    const mode = modal.dataset.mode;
+
+    if (!name) {
+        showToast('分类名称不能为空');
+        return;
+    }
+
+    try {
+        let response;
+        if (mode === 'add') {
+            response = await fetch(`${API_BASE}/api/categories`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ name })
+            });
+        } else {
+            const oldName = modal.dataset.oldName;
+            response = await fetch(`${API_BASE}/api/categories/${encodeURIComponent(oldName)}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                },
+                body: JSON.stringify({ name })
+            });
+        }
+
+        if (response.ok) {
+            closeModal('categoryModal');
+            showToast(mode === 'add' ? '分类已添加' : '分类已修改');
+            await loadCategories();
+            await loadLinks();
+            renderNav();
+            renderAllSections();
+            setupIntersectionObserver();
+        } else if (response.status === 401) {
+            showToast('登录已过期，请重新登录');
+            exitAdminMode();
+        } else {
+            const data = await response.json();
+            showToast(data.error || '操作失败');
+        }
+    } catch (error) {
+        showToast('操作失败，请重试');
+    }
+}
+
+// 打开删除分类弹窗
+function openDeleteCategoryModal(cat) {
+    document.getElementById('deleteCategoryModal').dataset.cat = cat;
+    document.getElementById('deleteCategoryMsg').textContent = `确定要删除分类「${cat}」？该分类下的所有链接也会被删除，此操作不可撤销。`;
+    openModal('deleteCategoryModal');
+}
+
+// 确认删除分类
+async function confirmDeleteCategory() {
+    const cat = document.getElementById('deleteCategoryModal').dataset.cat;
+    try {
+        const response = await fetch(`${API_BASE}/api/categories/${encodeURIComponent(cat)}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` }
+        });
+        if (response.ok) {
+            closeModal('deleteCategoryModal');
+            showToast('分类已删除');
+            await loadCategories();
+            await loadLinks();
+            renderNav();
+            renderAllSections();
+            setupIntersectionObserver();
+        } else if (response.status === 401) {
+            showToast('登录已过期，请重新登录');
+            exitAdminMode();
+        } else {
+            showToast('删除失败');
+        }
+    } catch (error) {
+        showToast('删除失败，请重试');
     }
 }
 

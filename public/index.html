@@ -123,6 +123,31 @@
             transform: scale(1.2);
         }
 
+        .nav-cat-del {
+            display: none;
+            margin-left: auto;
+            width: 18px;
+            height: 18px;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+            padding: 0;
+            transition: color 0.2s var(--ease-smooth);
+        }
+
+        body.admin-mode .nav-cat-del { display: block; }
+        .nav-cat-del:hover { color: #C75B5B; }
+
+        .nav-add-cat {
+            display: none;
+            color: var(--accent) !important;
+        }
+
+        body.admin-mode .nav-add-cat { display: flex; }
+
         .main {
             margin-left: 200px;
             padding: 48px 48px 120px;
@@ -492,12 +517,6 @@
             <div class="brand-subtitle">Sui Jianghua</div>
         </div>
         <nav class="nav">
-            <div class="nav-item active" data-cat="常用" onclick="scrollToSection('常用')"><span class="nav-dot"></span><span>常用</span></div>
-            <div class="nav-item" data-cat="学习" onclick="scrollToSection('学习')"><span class="nav-dot"></span><span>学习</span></div>
-            <div class="nav-item" data-cat="工作" onclick="scrollToSection('工作')"><span class="nav-dot"></span><span>工作</span></div>
-            <div class="nav-item" data-cat="政务" onclick="scrollToSection('政务')"><span class="nav-dot"></span><span>政务</span></div>
-            <div class="nav-item" data-cat="工具" onclick="scrollToSection('工具')"><span class="nav-dot"></span><span>工具</span></div>
-            <div class="nav-item" data-cat="其他" onclick="scrollToSection('其他')"><span class="nav-dot"></span><span>其他</span></div>
         </nav>
     </aside>
 
@@ -540,12 +559,6 @@
             <div class="form-group">
                 <label class="form-label">分类 *</label>
                 <select class="form-select" id="linkCategory">
-                    <option value="常用">常用</option>
-                    <option value="学习">学习</option>
-                    <option value="工作">工作</option>
-                    <option value="政务">政务</option>
-                    <option value="工具">工具</option>
-                    <option value="其他">其他</option>
                 </select>
             </div>
             <div class="modal-actions">
@@ -576,6 +589,31 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModal('importModal')">取消</button>
                 <button class="btn btn-primary" onclick="confirmImport()">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal">
+            <h3 class="modal-title" id="categoryModalTitle">添加分类</h3>
+            <div class="form-group">
+                <label class="form-label">分类名称 *</label>
+                <input type="text" class="form-input" id="categoryNameInput" placeholder="例如：娱乐">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('categoryModal')">取消</button>
+                <button class="btn btn-primary" onclick="saveCategory()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="deleteCategoryModal">
+        <div class="modal">
+            <h3 class="modal-title">确认删除分类</h3>
+            <p id="deleteCategoryMsg" style="color: var(--text-secondary); margin-bottom: 24px; font-size: 14px;"></p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal('deleteCategoryModal')">取消</button>
+                <button class="btn btn-danger" onclick="confirmDeleteCategory()">删除</button>
             </div>
         </div>
     </div>

@@ -20,8 +20,19 @@ app.use(express.json());
 // 确保数据文件存在
 function initDataFile() {
     if (!fs.existsSync(DATA_FILE)) {
-        const initialData = { links: [] };
+        const initialData = { categories: ['常用', '学习', '工作', '政务', '工具', '其他'], links: [] };
         fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2));
+    } else {
+        const data = readData();
+        if (!data.categories || data.categories.length === 0) {
+            data.categories = ['常用', '学习', '工作', '政务', '工具', '其他'];
+            writeData(data);
+        } else if (typeof data.categories[0] === 'object') {
+            data.categories = data.categories
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map(c => c.name || c);
+            writeData(data);
+        }
     }
 }
 
@@ -69,6 +80,79 @@ const LOCKOUT_TIME = 10 * 60 * 1000; // 10分钟
 app.get('/api/links', (req, res) => {
     const data = readData();
     res.json(data.links);
+});
+
+// 获取分类列表（公开）
+app.get('/api/categories', (req, res) => {
+    const data = readData();
+    res.json(data.categories || []);
+});
+
+// 添加分类（需认证）
+app.post('/api/categories', authMiddleware, (req, res) => {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: '分类名称不能为空' });
+    }
+    const data = readData();
+    if (!data.categories) data.categories = [];
+    if (data.categories.includes(name.trim())) {
+        return res.status(400).json({ error: '分类已存在' });
+    }
+    data.categories.push(name.trim());
+    writeData(data);
+    res.status(201).json({ name: name.trim() });
+});
+
+// 重命名分类（需认证）
+app.put('/api/categories/:name', authMiddleware, (req, res) => {
+    const oldName = decodeURIComponent(req.params.name);
+    const { name: newName } = req.body;
+    if (!newName || !newName.trim()) {
+        return res.status(400).json({ error: '分类名称不能为空' });
+    }
+    const data = readData();
+    if (!data.categories) data.categories = [];
+    const idx = data.categories.indexOf(oldName);
+    if (idx === -1) {
+        return res.status(404).json({ error: '分类不存在' });
+    }
+    if (data.categories.includes(newName.trim()) && oldName !== newName.trim()) {
+        return res.status(400).json({ error: '分类已存在' });
+    }
+    data.categories[idx] = newName.trim();
+    data.links.forEach(link => {
+        if (link.category === oldName) link.category = newName.trim();
+    });
+    writeData(data);
+    res.json({ name: newName.trim() });
+});
+
+// 删除分类（需认证）
+app.delete('/api/categories/:name', authMiddleware, (req, res) => {
+    const catName = decodeURIComponent(req.params.name);
+    const data = readData();
+    if (!data.categories) data.categories = [];
+    const idx = data.categories.indexOf(catName);
+    if (idx === -1) {
+        return res.status(404).json({ error: '分类不存在' });
+    }
+    data.categories.splice(idx, 1);
+    data.links = data.links.filter(link => link.category !== catName);
+    writeData(data);
+    res.json({ message: '分类已删除' });
+});
+
+// 排序分类（需认证）
+app.put('/api/categories/reorder', authMiddleware, (req, res) => {
+    const { categories } = req.body;
+    if (!categories || !Array.isArray(categories)) {
+        return res.status(400).json({ error: '请提供排序数据' });
+    }
+    const data = readData();
+    data.categories = categories;
+    writeData(data);
+    res.json({ message: '排序已保存' });
 });
 
 // 添加链接（需认证）
