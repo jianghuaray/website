@@ -158,7 +158,7 @@ function renderSection(category, categoryLinks) {
     header.className = 'section-header';
     header.innerHTML = `
         <h2 class="section-title">${category}</h2>
-        <span class="section-count">${categoryLinks.length} 个链接</span>
+        <span class="section-count">${categoryLinks.length}</span>
         <button class="btn-add" onclick="event.stopPropagation();openAddModal('${category}')">+ 添加</button>
     `;
     header.addEventListener('click', () => {
